@@ -9,10 +9,12 @@ export interface MailMessage {
 }
 
 /**
- * `console` logs the message (local dev).
- * `brevo` sends via Brevo's HTTP API: free tier is 300 emails/day, needs only a
- * verified sender address (no domain), and uses HTTPS, which free hosts like
- * Render and Railway don't block the way they block outbound SMTP.
+ * `console` logs the message (local dev only).
+ * `resend` / `brevo` send through the provider's HTTPS API: free hosts such as
+ * Render and Railway block outbound SMTP, but not HTTPS.
+ *
+ * Provider errors are reduced to status + error code: their messages can echo
+ * the recipient address, which must not reach the logs.
  */
 @Injectable()
 export class MailService {
@@ -21,14 +23,42 @@ export class MailService {
   constructor(private readonly config: ConfigService) {}
 
   async send(message: MailMessage): Promise<void> {
-    if (this.config.get('MAIL_PROVIDER') === 'brevo') {
-      return this.sendViaBrevo(message);
+    switch (this.config.get('MAIL_PROVIDER')) {
+      case 'resend':
+        return this.sendViaResend(message);
+      case 'brevo':
+        return this.sendViaBrevo(message);
+      default:
+        this.logger.log(
+          `[console mail] to=${message.to} subject="${message.subject}"\n${message.text}`,
+        );
     }
-    this.logger.log(
-      `[console mail] to=${message.to} subject="${message.subject}"\n${message.text}`,
-    );
   }
 
+  /** Free tier: 3 000 emails/month, 100/day; needs a verified domain. */
+  private async sendViaResend(message: MailMessage): Promise<void> {
+    const res = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${this.config.getOrThrow('RESEND_API_KEY')}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: `${this.config.get('MAIL_FROM_NAME')} <${this.config.getOrThrow('MAIL_FROM_EMAIL')}>`,
+        to: [message.to],
+        subject: message.subject,
+        html: message.html,
+        text: message.text,
+      }),
+    });
+
+    if (!res.ok) {
+      const { name } = await res.json().catch(() => ({ name: undefined }));
+      throw new Error(`Resend responded ${res.status} (${name ?? 'no code'})`);
+    }
+  }
+
+  /** Free tier: 300 emails/day; needs a verified sender and phone. */
   private async sendViaBrevo(message: MailMessage): Promise<void> {
     const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
@@ -50,7 +80,6 @@ export class MailService {
     });
 
     if (!res.ok) {
-      // Only Brevo's error code: its message can echo the recipient address.
       const { code } = await res.json().catch(() => ({ code: undefined }));
       throw new Error(`Brevo responded ${res.status} (${code ?? 'no code'})`);
     }

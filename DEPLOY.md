@@ -5,11 +5,11 @@
 | API (NestJS) | Render, web service | 512 МБ RAM, засыпает после 15 мин простоя |
 | Presidio | Render, web service | то же |
 | PostgreSQL | [Neon](https://neon.tech) | 0.5 ГБ |
-| Почта | [Brevo](https://www.brevo.com) | 300 писем в день |
+| Почта | [Resend](https://resend.com) | 3000 писем в месяц, 100 в день |
 | Фронтенд | Vercel (или Netlify) | — |
 
 Почему так:
-- **Почта через Brevo.** Бесплатные Render и Railway блокируют исходящий SMTP, а Brevo отправляет письма по HTTPS. Свой домен не нужен, достаточно подтвердить адрес отправителя.
+- **Почта через Resend.** Бесплатные Render и Railway блокируют исходящий SMTP, а Resend отправляет письма по HTTPS. Нужен свой домен (см. шаг 2). Brevo тоже поддерживается (`MAIL_PROVIDER=brevo`), но требует подтверждения телефона, а SMS на украинские номера доходят ненадёжно.
 - **База на Neon.** Бесплатный Postgres на Render удаляется через 30 дней.
 - **Регион.** Всё в EU (Frankfurt): это ближе к Украине и проще с точки зрения GDPR.
 
@@ -20,13 +20,14 @@
 
 Таблицы создавать не нужно: API применит миграции при первом запуске.
 
-## 2. Brevo
+## 2. Resend
 
-1. Зарегистрируйтесь.
-2. **Senders, Domains & Dedicated IPs → Senders → Add a sender.** Укажите адрес, с которого будут приходить письма, и подтвердите его по ссылке из письма. Это будет `MAIL_FROM_EMAIL`.
-3. **SMTP & API → API Keys → Generate a new API key.** Это будет `BREVO_API_KEY`.
+1. Зарегистрируйтесь на [resend.com](https://resend.com).
+2. **API Keys → Create API Key.** Permission: **Sending access**. Ключ начинается с `re_` и показывается один раз. Это будет `RESEND_API_KEY`.
+3. **Domains → Add Domain.** Укажите домен, лучше поддомен, например `mail.your-domain.com`. Регион: **eu-west-1 (Ireland)**. Resend покажет DNS-записи: MX и TXT для SPF, TXT для DKIM. Добавьте их у регистратора домена и нажмите **Verify**. Обычно проверка занимает от нескольких минут до часа.
+4. `MAIL_FROM_EMAIL` — любой адрес на этом домене, например `noreply@mail.your-domain.com`. Сам почтовый ящик создавать не нужно.
 
-> Письма с непроверенного бесплатного адреса (gmail.com и т.п.) иногда попадают в спам. Если это станет проблемой, подключите свой домен в Brevo (Domains → Authenticate).
+> **Без своего домена** можно отправлять с `onboarding@resend.dev`, но письма будут доходить **только на email, с которым вы зарегистрировались в Resend**. Этого хватит, чтобы проверить деплой самому, но другие пользователи войти не смогут. Если домена нет, подойдёт любой недорогой: .xyz, .site и т.п. обычно стоят $1–3 в первый год.
 
 ## 3. Render
 
@@ -38,8 +39,8 @@
    | Переменная | Значение |
    |---|---|
    | `DATABASE_URL` | строка подключения из Neon |
-   | `BREVO_API_KEY` | ключ из Brevo |
-   | `MAIL_FROM_EMAIL` | подтверждённый отправитель |
+   | `RESEND_API_KEY` | ключ из Resend (`re_…`) |
+   | `MAIL_FROM_EMAIL` | адрес на подтверждённом домене (или `onboarding@resend.dev` для теста) |
    | `PRESIDIO_URL` | `https://deid-presidio.onrender.com` — точный адрес видно на странице сервиса; если имя занято, Render добавит суффикс |
    | `APP_URL` | адрес фронтенда, например `https://deid-studio.vercel.app`, без `/` в конце |
 

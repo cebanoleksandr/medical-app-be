@@ -93,7 +93,7 @@ npm run migration:revert
 | `PSEUDONYM_SECRET` | ключ HMAC для псевдонимов; при смене псевдонимы меняются |
 | `SOURCE_ENCRYPTION_KEY` | шифрование источников синтетики; при смене текущие источники станут нечитаемыми (всё равно живут не дольше TTL) |
 | `PRESIDIO_URL`, `PRESIDIO_API_KEY` | сервис детекции; ключ должен совпадать с ключом Presidio |
-| `MAIL_PROVIDER`, `BREVO_API_KEY`, `MAIL_FROM_EMAIL` | почта; в production обязательно `brevo` |
+| `MAIL_PROVIDER`, `RESEND_API_KEY` / `BREVO_API_KEY`, `MAIL_FROM_EMAIL` | почта: `resend` (основной) или `brevo`; `console` в production запрещён |
 | `COOKIE_SECURE`, `COOKIE_SAMESITE`, `TRUST_PROXY` | настройки за прокси; для production см. DEPLOY.md |
 | `SYNTH_DATASET_TTL_MINUTES` | сколько живут датасеты и источники (по умолчанию 60) |
 | `AUDIT_RETENTION_DAYS` | срок хранения аудита (по умолчанию 365) |

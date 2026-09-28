@@ -29,18 +29,27 @@ export const envValidationSchema = Joi.object({
   // `console` logs sign-in links, so it must never run in production.
   MAIL_PROVIDER: Joi.when('NODE_ENV', {
     is: 'production',
-    then: Joi.string().valid('brevo').required(),
-    otherwise: Joi.string().valid('console', 'brevo').default('console'),
+    then: Joi.string().valid('resend', 'brevo').required(),
+    otherwise: Joi.string()
+      .valid('console', 'resend', 'brevo')
+      .default('console'),
+  }),
+  RESEND_API_KEY: Joi.string().when('MAIL_PROVIDER', {
+    is: 'resend',
+    then: Joi.required(),
+    otherwise: Joi.optional().allow(''),
   }),
   BREVO_API_KEY: Joi.string().when('MAIL_PROVIDER', {
     is: 'brevo',
     then: Joi.required(),
     otherwise: Joi.optional().allow(''),
   }),
+  // Resend: an address on a domain verified in Resend (or onboarding@resend.dev
+  // for tests, which only delivers to the Resend account's own email).
   MAIL_FROM_EMAIL: Joi.string()
     .email()
     .when('MAIL_PROVIDER', {
-      is: 'brevo',
+      is: Joi.valid('resend', 'brevo'),
       then: Joi.required(),
       otherwise: Joi.optional().allow(''),
     }),
@@ -54,10 +63,10 @@ export const envValidationSchema = Joi.object({
   // Keys the HMAC that seeds pseudonyms; rotating it changes every pseudonym.
   PSEUDONYM_SECRET: Joi.string().min(32).required(),
 
-  // How long a generated dataset stays downloadable ("session only").
   // Audit events older than this are deleted.
   AUDIT_RETENTION_DAYS: Joi.number().integer().min(1).default(365),
 
+  // How long a generated dataset stays downloadable ("session only").
   SYNTH_DATASET_TTL_MINUTES: Joi.number().integer().min(1).default(60),
   // 32 random bytes, base64 or base64url: encrypts stored file profiles and
   // templates. Render's generateValue produces a compatible value.

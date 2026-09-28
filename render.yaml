@@ -1,5 +1,5 @@
 # Render Blueprint: two free web services (API + Presidio).
-# Postgres lives on Neon and email on Brevo (see DEPLOY.md); their secrets are
+# Postgres lives on Neon and email on Resend (see DEPLOY.md); their secrets are
 # entered in the Render dashboard on first deploy (sync: false).
 
 envVarGroups:
@@ -54,10 +54,10 @@ services:
       - key: SOURCE_ENCRYPTION_KEY
         generateValue: true
       - key: MAIL_PROVIDER
-        value: brevo
-      - key: BREVO_API_KEY
+        value: resend
+      - key: RESEND_API_KEY
         sync: false
-      - key: MAIL_FROM_EMAIL # the sender address verified in Brevo
+      - key: MAIL_FROM_EMAIL # e.g. noreply@<domain verified in Resend>
         sync: false
       - key: MAIL_FROM_NAME
         value: De-ID Studio
