@@ -1,0 +1,63 @@
+# Render Blueprint: two free web services (API + Presidio).
+# Postgres lives on Neon and email on Brevo (see DEPLOY.md); their secrets are
+# entered in the Render dashboard on first deploy (sync: false).
+
+envVarGroups:
+  - name: deid-shared
+    envVars:
+      # Shared secret between the API and Presidio.
+      - key: PRESIDIO_API_KEY
+        generateValue: true
+
+services:
+  - type: web
+    name: deid-presidio
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./presidio/Dockerfile
+    dockerContext: ./presidio
+    healthCheckPath: /health
+    envVars:
+      - fromGroup: deid-shared
+
+  - type: web
+    name: deid-api
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - fromGroup: deid-shared
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: 'true'
+      - key: COOKIE_SECURE
+        value: 'true'
+      - key: COOKIE_SAMESITE
+        value: lax
+      - key: APP_URL # frontend origin, e.g. https://deid-studio.vercel.app
+        sync: false
+      - key: DATABASE_URL # Neon connection string
+        sync: false
+      - key: DATABASE_SSL
+        value: 'true'
+      - key: PRESIDIO_URL # https://deid-presidio.onrender.com (or its actual URL)
+        sync: false
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: PSEUDONYM_SECRET
+        generateValue: true
+      - key: SOURCE_ENCRYPTION_KEY
+        generateValue: true
+      - key: MAIL_PROVIDER
+        value: brevo
+      - key: BREVO_API_KEY
+        sync: false
+      - key: MAIL_FROM_EMAIL # the sender address verified in Brevo
+        sync: false
+      - key: MAIL_FROM_NAME
+        value: De-ID Studio

@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+test
+presidio
+.env
+.env.*
+!.env.example
+.git
+*.log
