@@ -90,7 +90,8 @@ npm run migration:revert
 
 | Переменная | Назначение |
 |---|---|
-| `APP_URL` | origin фронтенда: CORS и ссылка в письме |
+| `APP_URL` | origin фронтенда: CORS, ссылка в письме, ссылки Privacy/Terms в футере писем |
+| `PUBLIC_API_URL` | публичный адрес API для логотипа в письмах; на Render не нужен (берётся `RENDER_EXTERNAL_URL`) |
 | `DATABASE_URL`, `DATABASE_SSL` | Postgres |
 | `JWT_ACCESS_SECRET` | подпись access-токенов; при смене все пользователи разлогиниваются |
 | `PSEUDONYM_SECRET` | ключ HMAC для псевдонимов; при смене псевдонимы меняются |
@@ -114,7 +115,7 @@ npm run migration:revert
 | Synthetic | `GET synthetic/options`, `POST synthetic/datasets`, `GET synthetic/datasets/:id`, `…/records`, `…/records/:recordId`, `…/validation`, `…/download`, `POST …/regenerate` |
 | Sources | `POST synthetic/sources/file`, `POST synthetic/sources/analysis`, `GET synthetic/sources/:id` |
 | Activity | `GET activity`, `GET dashboard` |
-| Contact | `POST contact` — форма «Send us a message» на лендинге, без авторизации |
+| Contact | `POST contact` — форма «Send us a message» на лендинге, без авторизации: письмо команде и подтверждение посетителю (`locale: en|uk`) |
 
 ### Схема входа для фронтенда
 

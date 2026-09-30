@@ -84,7 +84,12 @@ export class AuthService {
 
     await this.mail.send({
       to: email,
-      ...renderMagicLinkEmail(locale, link.toString(), ttlMinutes),
+      ...renderMagicLinkEmail({
+        locale,
+        link: link.toString(),
+        ttlMinutes,
+        branding: this.mail.branding(),
+      }),
     });
   }
 

@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import { config } from 'dotenv';
@@ -39,8 +40,16 @@ export async function createTestApp(): Promise<TestApp> {
   assertLocalDatabase();
   const sent: MailMessage[] = [];
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
+    // Real templates and branding; only the sending is captured.
     .overrideProvider(MailService)
-    .useValue({ send: async (m: MailMessage) => void sent.push(m) })
+    .useFactory({
+      factory: (config: ConfigService) => {
+        const mail = new MailService(config);
+        mail.send = async (m: MailMessage) => void sent.push(m);
+        return mail;
+      },
+      inject: [ConfigService],
+    })
     .compile();
 
   const app = moduleRef.createNestApplication<NestExpressApplication>();

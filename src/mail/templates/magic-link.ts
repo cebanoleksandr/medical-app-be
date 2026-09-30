@@ -1,57 +1,92 @@
-export const SUPPORTED_LOCALES = ['en', 'uk'] as const;
-export type Locale = (typeof SUPPORTED_LOCALES)[number];
+import {
+  button,
+  card,
+  EmailBranding,
+  greeting,
+  heading,
+  Locale,
+  note,
+  paragraph,
+  renderLayout,
+  textFooter,
+} from './layout';
+
+export { SUPPORTED_LOCALES } from './layout';
+export type { Locale } from './layout';
 
 const copy: Record<
   Locale,
   {
     subject: string;
+    title: string;
+    greeting: string;
     intro: string;
-    button: string;
     expires: string;
+    button: string;
+    copyLink: string;
     ignore: string;
   }
 > = {
   en: {
     subject: 'Your sign-in link to De-ID Studio',
-    intro: 'Click the button below to sign in to De-ID Studio.',
-    button: 'Sign in',
+    title: 'Sign in to De-ID Studio',
+    greeting: 'Hello,',
+    intro: 'Use the button below to sign in to your account.',
     expires: 'The link expires in {minutes} minutes and can be used once.',
+    button: 'Sign in',
+    copyLink: 'Or paste this link into your browser:',
     ignore: "If you didn't request this email, you can safely ignore it.",
   },
   uk: {
     subject: 'Посилання для входу в De-ID Studio',
-    intro: 'Натисніть кнопку нижче, щоб увійти в De-ID Studio.',
-    button: 'Увійти',
+    title: 'Вхід у De-ID Studio',
+    greeting: 'Вітаємо!',
+    intro: 'Натисніть кнопку нижче, щоб увійти у свій обліковий запис.',
     expires:
       'Посилання дійсне {minutes} хвилин і може бути використане один раз.',
+    button: 'Увійти',
+    copyLink: 'Або вставте це посилання у браузер:',
     ignore: 'Якщо ви не запитували цей лист, просто проігноруйте його.',
   },
 };
 
-export function renderMagicLinkEmail(
-  locale: Locale,
-  link: string,
-  ttlMinutes: number,
-) {
+export function renderMagicLinkEmail(options: {
+  locale: Locale;
+  link: string;
+  ttlMinutes: number;
+  branding: EmailBranding;
+}) {
+  const { locale, link, ttlMinutes, branding } = options;
   const t = copy[locale];
   const expires = t.expires.replace('{minutes}', String(ttlMinutes));
 
-  const html = `<!doctype html>
-<html lang="${locale}">
-  <body style="margin:0;padding:32px;background:#f5f7fa;font-family:Arial,sans-serif;color:#0b1b33">
-    <table role="presentation" width="100%" style="max-width:480px;margin:0 auto;background:#fff;border-radius:8px;padding:32px">
-      <tr><td>
-        <h1 style="font-size:20px;margin:0 0 16px">De-ID Studio</h1>
-        <p style="margin:0 0 24px">${t.intro}</p>
-        <a href="${link}" style="display:inline-block;background:#1a2d5a;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px">${t.button}</a>
-        <p style="margin:24px 0 8px;font-size:13px;color:#5b6b82">${expires}</p>
-        <p style="margin:0;font-size:13px;color:#5b6b82">${t.ignore}</p>
-      </td></tr>
-    </table>
-  </body>
-</html>`;
+  const html = renderLayout({
+    locale,
+    branding,
+    preheader: expires,
+    body: [
+      heading(t.title),
+      greeting(t.greeting),
+      paragraph(t.intro, expires),
+      button(link, t.button),
+      card(t.copyLink, [link], { breakAll: true }),
+      note(t.ignore),
+    ].join('\n'),
+  });
 
-  const text = `${t.intro}\n\n${link}\n\n${expires}\n${t.ignore}`;
+  const text = [
+    t.title,
+    '',
+    t.greeting,
+    t.intro,
+    expires,
+    '',
+    link,
+    '',
+    t.ignore,
+    '',
+    textFooter(locale),
+  ].join('\n');
 
   return { subject: t.subject, html, text };
 }

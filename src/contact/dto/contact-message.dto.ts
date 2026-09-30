@@ -1,6 +1,8 @@
 import { Transform } from 'class-transformer';
+import { Locale, SUPPORTED_LOCALES } from '../../mail/templates/layout';
 import {
   IsEmail,
+  IsIn,
   IsOptional,
   IsString,
   Length,
@@ -40,6 +42,11 @@ export class ContactMessageDto {
   @IsString()
   @MaxLength(5000)
   message?: string;
+
+  /** Language of the confirmation email sent back to the visitor. */
+  @IsOptional()
+  @IsIn(SUPPORTED_LOCALES)
+  locale?: Locale;
 
   /**
    * Honeypot: render it as a hidden input and leave it empty. Bots fill in

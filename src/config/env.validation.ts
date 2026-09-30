@@ -13,6 +13,10 @@ export const envValidationSchema = Joi.object({
 
   // Frontend URL: used for CORS and for building the magic link.
   APP_URL: Joi.string().uri().required(),
+  // This API's public origin, for images in emails. On Render it defaults to
+  // RENDER_EXTERNAL_URL, which Render sets automatically.
+  PUBLIC_API_URL: Joi.string().uri().optional().allow(''),
+  RENDER_EXTERNAL_URL: Joi.string().uri().optional(),
 
   DATABASE_URL: Joi.string().uri().required(),
   DATABASE_SSL: Joi.boolean().default(false),

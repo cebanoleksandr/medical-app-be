@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { EmailBranding } from './templates/layout';
 
 export interface MailMessage {
   to: string;
@@ -23,6 +24,21 @@ export class MailService {
   private readonly logger = new Logger(MailService.name);
 
   constructor(private readonly config: ConfigService) {}
+
+  /**
+   * Absolute URLs for email templates. The logo is served by this API, so it
+   * needs the API's public origin: PUBLIC_API_URL, else the URL Render sets.
+   */
+  branding(): EmailBranding {
+    const apiOrigin =
+      this.config.get<string>('PUBLIC_API_URL') ||
+      this.config.get<string>('RENDER_EXTERNAL_URL') ||
+      `http://localhost:${this.config.get('PORT')}`;
+    return {
+      logoUrl: new URL('/api/email-assets/logo.png', apiOrigin).toString(),
+      appUrl: this.config.get<string>('APP_URL'),
+    };
+  }
 
   async send(message: MailMessage): Promise<void> {
     switch (this.config.get('MAIL_PROVIDER')) {

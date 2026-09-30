@@ -26,14 +26,34 @@ describe('Contact form (e2e)', () => {
     const { body } = await send(form).expect(202);
     expect(body.message).toMatch(/within 24 hours/);
 
-    expect(ctx.sent).toHaveLength(1);
-    const [mail] = ctx.sent;
-    expect(mail.to).toBe(ctx.app.get(ConfigService).get('CONTACT_TO_EMAIL'));
-    expect(mail.replyTo).toBe('olena.p@example.com');
-    expect(mail.subject).toBe(
+    expect(ctx.sent).toHaveLength(2);
+    const [team, confirmation] = ctx.sent;
+    expect(team.to).toBe(ctx.app.get(ConfigService).get('CONTACT_TO_EMAIL'));
+    expect(team.replyTo).toBe('olena.p@example.com');
+    expect(team.subject).toBe(
       'New contact request: Olena Petrenko (Kyiv Clinic)',
     );
-    expect(mail.text).toContain('We would like a demo for 20 doctors.');
+    expect(team.text).toContain('We would like a demo for 20 doctors.');
+
+    expect(confirmation.to).toBe('olena.p@example.com');
+    expect(confirmation.subject).toBe('We received your message');
+    expect(confirmation.html).toContain('Hi Olena,');
+    expect(confirmation.html).toContain('We would like a demo for 20 doctors.');
+  });
+
+  it("confirms in the visitor's language", async () => {
+    await send({ ...form, locale: 'uk' }).expect(202);
+    expect(ctx.sent[1].subject).toBe('Ми отримали ваше повідомлення');
+    await send({ ...form, locale: 'de' }).expect(400);
+  });
+
+  it('confirms to an address at most once an hour', async () => {
+    await send(form).expect(202);
+    await send(form).expect(202);
+    await send({ ...form, email: 'other@example.com' }).expect(202);
+    expect(
+      ctx.sent.map((m) => m.to).filter((to) => to !== ctx.sent[0].to),
+    ).toEqual(['olena.p@example.com', 'other@example.com']);
   });
 
   it('accepts the form without the optional fields', async () => {
@@ -42,7 +62,8 @@ describe('Contact form (e2e)', () => {
       lastName: 'Koval',
       email: 'ivan@example.com',
     }).expect(202);
-    expect(ctx.sent).toHaveLength(1);
+    expect(ctx.sent).toHaveLength(2);
+    expect(ctx.sent[1].html).not.toContain('Your message:');
   });
 
   it('validates the required fields', async () => {
@@ -62,6 +83,16 @@ describe('Contact form (e2e)', () => {
   it('limits submissions per client', async () => {
     for (let i = 0; i < 5; i++) await send(form).expect(202);
     await send(form).expect(429);
-    expect(ctx.sent).toHaveLength(5);
+    // Five to the team, one confirmation (once per address per hour).
+    expect(ctx.sent).toHaveLength(6);
+  });
+
+  it('serves the email logo to any client', async () => {
+    const res = await request(ctx.app.getHttpServer())
+      .get('/api/email-assets/logo.png')
+      .expect(200);
+    expect(res.headers['content-type']).toBe('image/png');
+    expect(res.headers['cross-origin-resource-policy']).toBe('cross-origin');
+    expect(res.body.length).toBeGreaterThan(1000);
   });
 });

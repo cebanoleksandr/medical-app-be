@@ -7,8 +7,14 @@
     "plugins": [
       {
         "name": "@nestjs/swagger",
-        "options": { "classValidatorShim": true, "introspectComments": true }
+        "options": {
+          "classValidatorShim": true,
+          "introspectComments": true
+        }
       }
+    ],
+    "assets": [
+      "mail/assets/**/*"
     ]
   }
 }
