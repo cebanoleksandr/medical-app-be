@@ -61,3 +61,5 @@ services:
         sync: false
       - key: MAIL_FROM_NAME
         value: De-ID Studio
+      - key: CONTACT_TO_EMAIL # team inbox for the landing page contact form
+        sync: false

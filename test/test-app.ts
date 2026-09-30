@@ -1,8 +1,10 @@
-import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { INestApplication } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
-import * as cookieParser from 'cookie-parser';
+import { config } from 'dotenv';
 import * as request from 'supertest';
 import { AppModule } from '../src/app.module';
+import { configureApp } from '../src/app.setup';
 import { MailMessage, MailService } from '../src/mail/mail.service';
 
 export interface TestApp {
@@ -10,18 +12,39 @@ export interface TestApp {
   sent: MailMessage[];
 }
 
+/**
+ * e2e tests create and delete users, so they must never touch a real
+ * database. Checked before the app boots (and runs migrations).
+ */
+function assertLocalDatabase() {
+  config();
+  const url = process.env.DATABASE_URL ?? '';
+  const host = (() => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return '';
+    }
+  })();
+  if (!['localhost', '127.0.0.1', '::1'].includes(host)) {
+    throw new Error(
+      `e2e tests only run against a local database, but DATABASE_URL points to "${host || url}". ` +
+        'Use the docker compose Postgres (see .env.example).',
+    );
+  }
+}
+
 /** Boots the real app against the dev database; emails are captured in `sent`. */
 export async function createTestApp(): Promise<TestApp> {
+  assertLocalDatabase();
   const sent: MailMessage[] = [];
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
     .overrideProvider(MailService)
     .useValue({ send: async (m: MailMessage) => void sent.push(m) })
     .compile();
 
-  const app = moduleRef.createNestApplication();
-  app.setGlobalPrefix('api');
-  app.use(cookieParser());
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
+  const app = moduleRef.createNestApplication<NestExpressApplication>();
+  configureApp(app);
   await app.init();
   return { app, sent };
 }

@@ -6,6 +6,8 @@ export interface MailMessage {
   subject: string;
   html: string;
   text: string;
+  /** Where replies go, e.g. the visitor who filled in the contact form. */
+  replyTo?: string;
 }
 
 /**
@@ -49,6 +51,7 @@ export class MailService {
         subject: message.subject,
         html: message.html,
         text: message.text,
+        ...(message.replyTo ? { reply_to: message.replyTo } : {}),
       }),
     });
 
@@ -76,6 +79,7 @@ export class MailService {
         subject: message.subject,
         htmlContent: message.html,
         textContent: message.text,
+        ...(message.replyTo ? { replyTo: { email: message.replyTo } } : {}),
       }),
     });
 

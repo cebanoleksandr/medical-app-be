@@ -64,6 +64,9 @@ npm run start:dev           # API на http://localhost:3000/api
 ```bash
 npm test                 # unit
 npm run test:e2e         # e2e: нужен `docker compose up -d` (Postgres + Presidio)
+# e2e создают и удаляют пользователей, поэтому запускаются только с локальной базой.
+# Если в .env указана Neon, переопределите базу на время запуска:
+DATABASE_URL=postgres://deid:deid@localhost:5440/deid DATABASE_SSL=false npm run test:e2e
 npm run lint
 
 # тесты Presidio
@@ -93,6 +96,7 @@ npm run migration:revert
 | `PSEUDONYM_SECRET` | ключ HMAC для псевдонимов; при смене псевдонимы меняются |
 | `SOURCE_ENCRYPTION_KEY` | шифрование источников синтетики; при смене текущие источники станут нечитаемыми (всё равно живут не дольше TTL) |
 | `PRESIDIO_URL`, `PRESIDIO_API_KEY` | сервис детекции; ключ должен совпадать с ключом Presidio |
+| `CONTACT_TO_EMAIL` | куда пересылаются сообщения из формы на лендинге |
 | `MAIL_PROVIDER`, `RESEND_API_KEY` / `BREVO_API_KEY`, `MAIL_FROM_EMAIL` | почта: `resend` (основной) или `brevo`; `console` в production запрещён |
 | `COOKIE_SECURE`, `COOKIE_SAMESITE`, `TRUST_PROXY` | настройки за прокси; для production см. DEPLOY.md |
 | `SYNTH_DATASET_TTL_MINUTES` | сколько живут датасеты и источники (по умолчанию 60) |
@@ -110,6 +114,7 @@ npm run migration:revert
 | Synthetic | `GET synthetic/options`, `POST synthetic/datasets`, `GET synthetic/datasets/:id`, `…/records`, `…/records/:recordId`, `…/validation`, `…/download`, `POST …/regenerate` |
 | Sources | `POST synthetic/sources/file`, `POST synthetic/sources/analysis`, `GET synthetic/sources/:id` |
 | Activity | `GET activity`, `GET dashboard` |
+| Contact | `POST contact` — форма «Send us a message» на лендинге, без авторизации |
 
 ### Схема входа для фронтенда
 

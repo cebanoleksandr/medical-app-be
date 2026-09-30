@@ -54,6 +54,8 @@ export const envValidationSchema = Joi.object({
       otherwise: Joi.optional().allow(''),
     }),
   MAIL_FROM_NAME: Joi.string().default('De-ID Studio'),
+  // Inbox for the landing page contact form; the form returns 503 without it.
+  CONTACT_TO_EMAIL: Joi.string().email().optional().allow(''),
 
   PRESIDIO_URL: Joi.string().uri().default('http://localhost:5001'),
   PRESIDIO_API_KEY: Joi.string().min(16).required(),

@@ -6,9 +6,11 @@ import {
   IsEnum,
   IsInt,
   IsNumber,
+  IsOptional,
   IsString,
   Length,
   Max,
+  MaxLength,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -39,6 +41,27 @@ export class RenderEntityDto {
 
   @IsBoolean()
   included: boolean;
+
+  // Fields of the analysis response, accepted so the client can send entities
+  // back as it received them. The server recomputes all of them.
+  @IsOptional()
+  @IsString()
+  @MaxLength(MAX_TEXT_LENGTH)
+  text?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  identifier?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  lowConfidence?: boolean;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(MAX_TEXT_LENGTH)
+  replacement?: string | null;
 }
 
 /**

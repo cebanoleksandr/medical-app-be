@@ -41,6 +41,7 @@
    | `DATABASE_URL` | строка подключения из Neon |
    | `RESEND_API_KEY` | ключ из Resend (`re_…`) |
    | `MAIL_FROM_EMAIL` | адрес на подтверждённом домене (или `onboarding@resend.dev` для теста) |
+   | `CONTACT_TO_EMAIL` | почта команды, куда приходят сообщения из формы на лендинге. Без своего домена в Resend — только email вашего аккаунта Resend |
    | `PRESIDIO_URL` | `https://deid-presidio.onrender.com` — точный адрес видно на странице сервиса; если имя занято, Render добавит суффикс |
    | `APP_URL` | адрес фронтенда, например `https://deid-studio.vercel.app`, без `/` в конце |
 
