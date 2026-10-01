@@ -11,12 +11,20 @@ import { Repository } from 'typeorm';
 import { AuditAction } from '../audit/audit-event.entity';
 import { AuditService } from '../audit/audit.service';
 import { applyReplacements, hasOverlaps, resolveOverlaps } from './anonymizer';
+import {
+  ENTITY_CONFIG_FRAMEWORKS,
+  ENTITY_TYPE_BY_PRESIDIO,
+  EntityConfigError,
+  EntityMethods,
+  EntityType,
+  resolveEntityMethods,
+} from './catalog/entities';
 import { findMethod } from './catalog/frameworks';
 import { entityTypeIndex, IdentifierKey } from './catalog/identifiers';
 import { CreateAnalysisDto } from './dto/create-analysis.dto';
 import { RenderAnalysisDto, RenderEntityDto } from './dto/render-analysis.dto';
 import { Analysis, Sensitivity } from './entities/analysis.entity';
-import { buildReplacements } from './operators';
+import { buildEntityReplacements, buildReplacements } from './operators';
 import { AnalysisLanguage, PresidioClient } from './presidio.client';
 
 const SCORE_THRESHOLDS: Record<Sensitivity, number> = {
@@ -38,7 +46,9 @@ interface EntityInput {
 }
 
 export interface DetectedEntityView extends EntityInput {
-  identifier: IdentifierKey;
+  identifier: IdentifierKey | undefined;
+  /** Analyses run with a risk level: the entity type that set its method. */
+  entityType: EntityType | undefined;
   text: string;
   lowConfidence: boolean;
   /** null when the entity is excluded and left unchanged. */
@@ -57,7 +67,11 @@ export class AnalysesService {
   async create(userId: string, dto: CreateAnalysisDto) {
     const started = performance.now();
     const identifiers = this.resolveIdentifiers(dto);
-    const entityTypes = [...entityTypeIndex(identifiers).keys()];
+    const entityMethods = this.resolveEntityConfig(dto);
+    // With a risk level every entity type gets a method, so all are detected.
+    const entityTypes = entityMethods
+      ? [...ENTITY_TYPE_BY_PRESIDIO.keys()]
+      : [...entityTypeIndex(identifiers).keys()];
 
     const spans = entityTypes.length
       ? await this.presidio.analyze({
@@ -80,6 +94,8 @@ export class AnalysesService {
       method: dto.method,
       identifiers,
       outputMode: dto.outputMode,
+      riskLevel: dto.riskLevel ?? null,
+      entityMethods,
       language: dto.language,
       sensitivity: dto.sensitivity,
       inputLength: dto.text.length,
@@ -96,6 +112,7 @@ export class AnalysesService {
     await this.audit.record(userId, AuditAction.ANALYSIS_CREATED, analysis.id, {
       framework: analysis.framework,
       method: analysis.method,
+      riskLevel: analysis.riskLevel,
       language: analysis.language,
       detected: analysis.detectedCount,
     });
@@ -107,7 +124,7 @@ export class AnalysesService {
   async render(userId: string, id: string, dto: RenderAnalysisDto) {
     const analysis = await this.loadWithClientState(userId, id, dto);
 
-    analysis.outputMode = dto.outputMode;
+    this.applyRenderSettings(analysis, dto);
     const view = this.buildView(analysis, dto.text, dto.entities);
     analysis.processedCount = dto.entities.filter((e) => e.included).length;
     await this.analyses.save(analysis);
@@ -132,6 +149,44 @@ export class AnalysesService {
     }
     this.assertValidEntities(analysis, state);
     return analysis;
+  }
+
+  /** Methods per entity type, or null for an output-mode analysis. */
+  private resolveEntityConfig(dto: CreateAnalysisDto): EntityMethods | null {
+    if (!dto.riskLevel) {
+      if (dto.entityMethods) {
+        throw new BadRequestException('entityMethods requires riskLevel');
+      }
+      return null;
+    }
+    if (!ENTITY_CONFIG_FRAMEWORKS.includes(dto.framework)) {
+      throw new BadRequestException(
+        `${dto.framework} uses an output mode, not a risk level`,
+      );
+    }
+    return toBadRequest(() =>
+      resolveEntityMethods(dto.riskLevel!, dto.entityMethods),
+    );
+  }
+
+  /** A render keeps the analysis' kind: output mode or methods per entity. */
+  private applyRenderSettings(analysis: Analysis, dto: RenderAnalysisDto) {
+    if (analysis.riskLevel) {
+      if (dto.entityMethods) {
+        analysis.entityMethods = toBadRequest(() =>
+          resolveEntityMethods(analysis.riskLevel!, dto.entityMethods),
+        );
+      }
+      return;
+    }
+    if (dto.entityMethods) {
+      throw new BadRequestException(
+        'This analysis uses an output mode, not entityMethods',
+      );
+    }
+    if (!dto.outputMode)
+      throw new BadRequestException('outputMode is required');
+    analysis.outputMode = dto.outputMode;
   }
 
   private resolveIdentifiers(dto: CreateAnalysisDto): IdentifierKey[] {
@@ -163,7 +218,9 @@ export class AnalysesService {
     analysis: Analysis,
     dto: { text: string; entities: RenderEntityDto[] },
   ) {
-    const applied = entityTypeIndex(analysis.identifiers);
+    const applied: ReadonlyMap<string, unknown> = analysis.entityMethods
+      ? ENTITY_TYPE_BY_PRESIDIO
+      : entityTypeIndex(analysis.identifiers);
     const ids = new Set<string>();
 
     for (const e of dto.entities) {
@@ -188,18 +245,25 @@ export class AnalysesService {
   private buildView(analysis: Analysis, text: string, entities: EntityInput[]) {
     const identifierByType = entityTypeIndex(analysis.identifiers);
     const included = entities.filter((e) => e.included);
-    const replacements = buildReplacements(
-      included.map((e) => ({
-        type: e.type,
-        value: text.slice(e.start, e.end),
-      })),
-      {
-        mode: analysis.outputMode,
-        language: analysis.language as AnalysisLanguage,
-        analysisId: analysis.id,
-        pseudonymSecret: this.config.getOrThrow('PSEUDONYM_SECRET'),
-      },
-    );
+    const targets = included.map((e) => ({
+      type: e.type,
+      value: text.slice(e.start, e.end),
+    }));
+    const ctx = {
+      language: analysis.language as AnalysisLanguage,
+      analysisId: analysis.id,
+      pseudonymSecret: this.config.getOrThrow<string>('PSEUDONYM_SECRET'),
+    };
+    const { entityMethods } = analysis;
+    const replacements = entityMethods
+      ? buildEntityReplacements(
+          targets.map((t) => ({
+            ...t,
+            method: entityMethods[ENTITY_TYPE_BY_PRESIDIO.get(t.type)!],
+          })),
+          ctx,
+        )
+      : buildReplacements(targets, { ...ctx, mode: analysis.outputMode });
     const replacementById = new Map(
       included.map((e, i) => [e.id, replacements[i]]),
     );
@@ -209,6 +273,9 @@ export class AnalysesService {
         id: e.id,
         type: e.type,
         identifier: identifierByType.get(e.type),
+        entityType: analysis.entityMethods
+          ? ENTITY_TYPE_BY_PRESIDIO.get(e.type)
+          : undefined,
         text: text.slice(e.start, e.end),
         start: e.start,
         end: e.end,
@@ -239,6 +306,8 @@ export class AnalysesService {
       method: analysis.method,
       identifiers: analysis.identifiers,
       outputMode: analysis.outputMode,
+      riskLevel: analysis.riskLevel,
+      entityMethods: analysis.entityMethods,
       language: analysis.language,
       sensitivity: analysis.sensitivity,
       stats: {
@@ -249,6 +318,18 @@ export class AnalysesService {
       },
       ...view,
     };
+  }
+}
+
+/** Catalogue rule violations (unknown keys, special categories) are 400s. */
+function toBadRequest<T>(fn: () => T): T {
+  try {
+    return fn();
+  } catch (err) {
+    if (err instanceof EntityConfigError) {
+      throw new BadRequestException(err.message);
+    }
+    throw err;
   }
 }
 

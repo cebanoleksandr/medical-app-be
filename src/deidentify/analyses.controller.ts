@@ -26,6 +26,7 @@ import { frameworksView } from './catalog/frameworks';
 import { CreateAnalysisDto } from './dto/create-analysis.dto';
 import { RenderAnalysisDto } from './dto/render-analysis.dto';
 import { Sensitivity } from './entities/analysis.entity';
+import { entityConfigView } from './catalog/entities';
 import { OUTPUT_MODES } from './operators';
 import { PresidioClient } from './presidio.client';
 import { extname } from 'path';
@@ -55,6 +56,8 @@ export class AnalysesController {
       outputModes: OUTPUT_MODES,
       sensitivities: Object.values(Sensitivity),
       languages: ['en', 'uk'],
+      // GDPR, UK GDPR, FADP: risk levels and their methods per entity type.
+      entityConfig: entityConfigView(),
     };
   }
 

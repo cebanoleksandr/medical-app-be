@@ -8,6 +8,7 @@ import {
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { User } from '../../users/user.entity';
+import { EntityMethods, RiskLevel } from '../catalog/entities';
 import { DeidMethod, Framework } from '../catalog/frameworks';
 import { IdentifierKey } from '../catalog/identifiers';
 import { OutputMode } from '../operators';
@@ -45,8 +46,17 @@ export class Analysis {
   @Column({ type: 'text', array: true })
   identifiers: IdentifierKey[];
 
+  /** Ignored when `entityMethods` is set. */
   @Column({ name: 'output_mode', type: 'varchar', length: 16 })
   outputMode: OutputMode;
+
+  /** Set for GDPR, UK GDPR and FADP analyses run with a risk level. */
+  @Column({ name: 'risk_level', type: 'varchar', length: 8, nullable: true })
+  riskLevel: RiskLevel | null;
+
+  /** Method per entity type (settings, never values); null with an output mode. */
+  @Column({ name: 'entity_methods', type: 'jsonb', nullable: true })
+  entityMethods: EntityMethods | null;
 
   @Column({ type: 'varchar', length: 8 })
   language: string;

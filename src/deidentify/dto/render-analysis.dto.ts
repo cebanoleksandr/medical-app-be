@@ -6,6 +6,7 @@ import {
   IsEnum,
   IsInt,
   IsNumber,
+  IsObject,
   IsOptional,
   IsString,
   Length,
@@ -14,6 +15,7 @@ import {
   Min,
   ValidateNested,
 } from 'class-validator';
+import { EntityMethod } from '../catalog/entities';
 import { OutputMode } from '../operators';
 import { MAX_TEXT_LENGTH } from './create-analysis.dto';
 
@@ -60,6 +62,11 @@ export class RenderEntityDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(64)
+  entityType?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(MAX_TEXT_LENGTH)
   replacement?: string | null;
 }
@@ -73,8 +80,18 @@ export class RenderAnalysisDto {
   @Length(50, MAX_TEXT_LENGTH)
   text: string;
 
+  /** Required for analyses run with an output mode (HIPAA). */
+  @IsOptional()
   @IsEnum(OutputMode)
-  outputMode: OutputMode;
+  outputMode?: OutputMode;
+
+  /**
+   * Analyses run with a risk level: overrides of its preset, replacing the
+   * ones the analysis was run with. Omit to keep those.
+   */
+  @IsOptional()
+  @IsObject()
+  entityMethods?: Partial<Record<string, EntityMethod>>;
 
   @IsArray()
   @ArrayMaxSize(2000)

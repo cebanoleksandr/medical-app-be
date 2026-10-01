@@ -251,6 +251,83 @@ describe('Analyses (e2e)', () => {
     });
   });
 
+  describe('risk levels (GDPR, UK GDPR, FADP)', () => {
+    const GDPR = {
+      text: TEXT,
+      language: 'en',
+      framework: 'EU_GDPR',
+      method: 'ANONYMISATION',
+      riskLevel: 'MEDIUM',
+    };
+    const replacementOf = (
+      body: { entities: { text: string; replacement: string }[] },
+      value: string,
+    ) => body.entities.find((e) => e.text === value)?.replacement;
+
+    it('serves the presets with the options', async () => {
+      const { body } = await auth(http().get('/api/analyses/options')).expect(
+        200,
+      );
+      expect(body.entityConfig.riskLevels).toEqual(['LOW', 'MEDIUM', 'HIGH']);
+      expect(body.entityConfig.riskPresets.MEDIUM.PERSON).toBe('TOKEN');
+      expect(body.entityConfig.entityTypes).toContainEqual({
+        type: 'PHOTO',
+        special: true,
+        detectable: false,
+      });
+    });
+
+    it('applies the preset method of each entity type', async () => {
+      const { body } = await analyze(GDPR).expect(201);
+      expect(body.riskLevel).toBe('MEDIUM');
+      expect(body.entityMethods.EMAIL).toBe('REDACT');
+      expect(replacementOf(body, 'sarah.johnson@email.com')).toBe('[REDACTED]');
+      expect(replacementOf(body, '192.168.1.45')).toBe('192.168.1.0/24');
+      expect(replacementOf(body, 'MRN78945612')).toMatch(/^PSN-/);
+      const person = body.entities.find((e) => e.type === 'PERSON');
+      expect(person.entityType).toBe('PERSON');
+      expect(person.replacement).toMatch(/^PATIENT_[0-9A-F]{6}$/);
+      expect(body.deidentifiedText).not.toContain('Sarah Johnson');
+    });
+
+    it('takes overrides and keeps them on render', async () => {
+      const { body } = await analyze({
+        ...GDPR,
+        entityMethods: { EMAIL: 'MASK' },
+      }).expect(201);
+      expect(replacementOf(body, 'sarah.johnson@email.com')).toBe(
+        's****.*******@email.com',
+      );
+
+      const rendered = await render(body.id, {
+        text: TEXT,
+        entities: body.entities,
+        entityMethods: { EMAIL: 'PLACEHOLDER' },
+      }).expect(200);
+      expect(replacementOf(rendered.body, 'sarah.johnson@email.com')).toBe(
+        '[EMAIL_1]',
+      );
+      expect(rendered.body.entityMethods.EMAIL).toBe('PLACEHOLDER');
+    });
+
+    it('rejects invalid configurations', async () => {
+      await analyze({ ...GDPR, entityMethods: { PHOTO: 'MASK' } }).expect(400);
+      await analyze({ ...GDPR, entityMethods: { SHOE: 'MASK' } }).expect(400);
+      await analyze({
+        ...GDPR,
+        riskLevel: undefined,
+        entityMethods: {},
+      }).expect(400);
+      await analyze({ ...HIPAA, riskLevel: 'LOW' }).expect(400);
+
+      const hipaa = (await analyze(HIPAA).expect(201)).body;
+      await render(hipaa.id, {
+        text: TEXT,
+        entities: hipaa.entities,
+      }).expect(400);
+    });
+  });
+
   describe('extract-text', () => {
     const upload = (buffer: Buffer, filename: string) =>
       auth(http().post('/api/analyses/extract-text')).attach(
