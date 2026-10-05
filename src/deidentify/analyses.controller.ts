@@ -8,6 +8,7 @@ import {
   Param,
   ParseUUIDPipe,
   Post,
+  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -24,6 +25,7 @@ import { AuditService } from '../audit/audit.service';
 import { AnalysesService } from './analyses.service';
 import { frameworksView } from './catalog/frameworks';
 import { CreateAnalysisDto } from './dto/create-analysis.dto';
+import { ListAnalysesDto } from './dto/list-analyses.dto';
 import { RenderAnalysisDto } from './dto/render-analysis.dto';
 import { Sensitivity } from './entities/analysis.entity';
 import { entityConfigView } from './catalog/entities';
@@ -90,6 +92,12 @@ export class AnalysesController {
       characters: text.length,
     });
     return { text, characters: text.length };
+  }
+
+  /** The user's past analyses, newest first (metadata only). */
+  @Get()
+  list(@CurrentUser() user: AuthUser, @Query() query: ListAnalysesDto) {
+    return this.analyses.list(user.id, query);
   }
 
   @Throttle({ default: { limit: 30, ttl: 60_000 } })

@@ -7,7 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { performance } from 'perf_hooks';
-import { Repository } from 'typeorm';
+import { LessThan, Repository } from 'typeorm';
 import { AuditAction } from '../audit/audit-event.entity';
 import { AuditService } from '../audit/audit.service';
 import { applyReplacements, hasOverlaps, resolveOverlaps } from './anonymizer';
@@ -19,7 +19,7 @@ import {
   EntityType,
   resolveEntityMethods,
 } from './catalog/entities';
-import { findMethod } from './catalog/frameworks';
+import { findMethod, Framework } from './catalog/frameworks';
 import { entityTypeIndex, IdentifierKey } from './catalog/identifiers';
 import { CreateAnalysisDto } from './dto/create-analysis.dto';
 import { RenderAnalysisDto, RenderEntityDto } from './dto/render-analysis.dto';
@@ -63,6 +63,37 @@ export class AnalysesService {
     private readonly config: ConfigService,
     private readonly audit: AuditService,
   ) {}
+
+  /** The user's analyses, newest first: settings and counts, never text. */
+  async list(
+    userId: string,
+    {
+      limit,
+      before,
+      framework,
+    }: { limit: number; before?: Date; framework?: Framework },
+  ) {
+    const rows = await this.analyses.find({
+      where: {
+        userId,
+        ...(before ? { createdAt: LessThan(before) } : {}),
+        ...(framework ? { framework } : {}),
+      },
+      order: { createdAt: 'DESC' },
+      take: limit,
+    });
+    return rows.map((a) => ({
+      id: a.id,
+      createdAt: a.createdAt,
+      framework: a.framework,
+      method: a.method,
+      riskLevel: a.riskLevel,
+      language: a.language,
+      characters: a.inputLength,
+      detected: a.detectedCount,
+      processed: a.processedCount,
+    }));
+  }
 
   async create(userId: string, dto: CreateAnalysisDto) {
     const started = performance.now();
