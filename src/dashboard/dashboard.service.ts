@@ -100,10 +100,13 @@ export class DashboardService {
       frameworks,
       entityTypes,
       methods,
-      recentAnalyses: await this.analyses.list(userId, {
-        limit: RECENT_ANALYSES,
-        framework: query.framework,
-      }),
+      recentAnalyses: (
+        await this.analyses.list(userId, {
+          limit: RECENT_ANALYSES,
+          offset: 0,
+          framework: query.framework,
+        })
+      ).items,
       recentActivity: await this.audit.list(userId, 10),
     };
   }

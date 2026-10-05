@@ -198,39 +198,72 @@ describe('Dashboard (e2e)', () => {
   });
 
   describe('GET /analyses', () => {
-    it('pages newest first with a cursor', async () => {
-      const first = await auth(
-        http().get('/api/analyses').query({ limit: 2 }),
-      ).expect(200);
-      expect(first.body.map((a) => a.createdAt)).toEqual([
+    const list = (
+      query: Record<string, string | number> = {},
+      token?: string,
+    ) => auth(http().get('/api/analyses').query(query), token);
+
+    it('pages newest first with a total', async () => {
+      const first = await list({ limit: 2 }).expect(200);
+      expect(first.body).toMatchObject({ total: 3, offset: 0, limit: 2 });
+      expect(first.body.items.map((a) => a.createdAt)).toEqual([
         '2026-04-03T23:30:00.000Z',
         '2026-04-01T10:00:00.000Z',
       ]);
-      const next = await auth(
-        http()
-          .get('/api/analyses')
-          .query({ limit: 2, before: first.body[1].createdAt }),
-      ).expect(200);
-      expect(next.body.map((a) => a.createdAt)).toEqual([
+      const next = await list({ limit: 2, offset: 2 }).expect(200);
+      expect(next.body.items.map((a) => a.createdAt)).toEqual([
         '2026-03-01T10:00:00.000Z',
       ]);
     });
 
-    it('filters by framework and hides other users', async () => {
-      const gdpr = await auth(
-        http().get('/api/analyses').query({ framework: 'EU_GDPR' }),
-      ).expect(200);
-      expect(gdpr.body).toHaveLength(1);
+    it('filters by framework and period', async () => {
+      const gdpr = await list({ framework: 'EU_GDPR' }).expect(200);
+      expect(gdpr.body.total).toBe(1);
 
+      const april = await list(PERIOD).expect(200);
+      expect(april.body.total).toBe(2);
+      const fromOnly = await list({ from: '2026-04-02T00:00:00Z' }).expect(200);
+      expect(fromOnly.body.total).toBe(1);
+      const toOnly = await list({ to: '2026-03-31T00:00:00Z' }).expect(200);
+      expect(toOnly.body.total).toBe(1);
+
+      await list({ from: PERIOD.to, to: PERIOD.from }).expect(400);
+      await list({ limit: 101 }).expect(400);
+    });
+
+    it("hides other users' analyses", async () => {
       const other = await signIn(
         ctx,
         `e2e-dashboard-other-${Date.now()}@example.com`,
       );
-      const theirs = await auth(
-        http().get('/api/analyses'),
-        other.accessToken,
+      const theirs = await list({}, other.accessToken).expect(200);
+      expect(theirs.body).toEqual({
+        total: 0,
+        offset: 0,
+        limit: 10,
+        items: [],
+      });
+    });
+  });
+
+  describe('GET /analyses/export', () => {
+    it('downloads the filtered list as CSV', async () => {
+      const res = await auth(
+        http().get('/api/analyses/export').query({ framework: 'HIPAA' }),
       ).expect(200);
-      expect(theirs.body).toEqual([]);
+      expect(res.headers['content-type']).toContain('text/csv');
+      expect(res.headers['content-disposition']).toContain('analyses.csv');
+      const lines = res.text
+        .replace(/^\uFEFF/, '')
+        .trim()
+        .split('\r\n');
+      expect(lines[0]).toBe(
+        'id,created_at,framework,method,risk_level,language,characters,entities_detected,entities_processed',
+      );
+      expect(lines).toHaveLength(3);
+      expect(lines[1]).toMatch(
+        /^[0-9a-f-]{36},2026-04-01T10:00:00.000Z,HIPAA,SAFE_HARBOR,,en,120,3,2$/,
+      );
     });
   });
 });

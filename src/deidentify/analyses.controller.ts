@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Param,
@@ -25,7 +26,7 @@ import { AuditService } from '../audit/audit.service';
 import { AnalysesService } from './analyses.service';
 import { frameworksView } from './catalog/frameworks';
 import { CreateAnalysisDto } from './dto/create-analysis.dto';
-import { ListAnalysesDto } from './dto/list-analyses.dto';
+import { AnalysesFilterDto, ListAnalysesDto } from './dto/list-analyses.dto';
 import { RenderAnalysisDto } from './dto/render-analysis.dto';
 import { Sensitivity } from './entities/analysis.entity';
 import { entityConfigView } from './catalog/entities';
@@ -94,10 +95,20 @@ export class AnalysesController {
     return { text, characters: text.length };
   }
 
-  /** The user's past analyses, newest first (metadata only). */
+  /** The user's past analyses, newest first (metadata only), one page. */
   @Get()
   list(@CurrentUser() user: AuthUser, @Query() query: ListAnalysesDto) {
     return this.analyses.list(user.id, query);
+  }
+
+  /** The same list, filtered alike, as a CSV download. */
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Get('export')
+  @Header('content-type', 'text/csv; charset=utf-8')
+  @Header('content-disposition', 'attachment; filename="analyses.csv"')
+  @Header('cache-control', 'no-store')
+  export(@CurrentUser() user: AuthUser, @Query() query: AnalysesFilterDto) {
+    return this.analyses.exportCsv(user.id, query);
   }
 
   @Throttle({ default: { limit: 30, ttl: 60_000 } })

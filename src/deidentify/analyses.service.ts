@@ -7,7 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { performance } from 'perf_hooks';
-import { LessThan, Repository } from 'typeorm';
+import { Between, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 import { AuditAction } from '../audit/audit-event.entity';
 import { AuditService } from '../audit/audit.service';
 import { applyReplacements, hasOverlaps, resolveOverlaps } from './anonymizer';
@@ -19,9 +19,10 @@ import {
   EntityType,
   resolveEntityMethods,
 } from './catalog/entities';
-import { findMethod, Framework } from './catalog/frameworks';
+import { findMethod } from './catalog/frameworks';
 import { entityTypeIndex, IdentifierKey } from './catalog/identifiers';
 import { CreateAnalysisDto } from './dto/create-analysis.dto';
+import { AnalysesFilterDto, ListAnalysesDto } from './dto/list-analyses.dto';
 import { RenderAnalysisDto, RenderEntityDto } from './dto/render-analysis.dto';
 import { Analysis, Sensitivity } from './entities/analysis.entity';
 import { buildEntityReplacements, buildReplacements } from './operators';
@@ -32,6 +33,43 @@ const SCORE_THRESHOLDS: Record<Sensitivity, number> = {
   [Sensitivity.BALANCED]: 0.4,
   [Sensitivity.AGGRESSIVE]: 0.25,
 };
+
+/** Rows in one CSV export; the UI pages through more than this. */
+const EXPORT_LIMIT = 10_000;
+
+type AnalysisSummary = ReturnType<typeof toSummary>;
+
+function toSummary(a: Analysis) {
+  return {
+    id: a.id,
+    createdAt: a.createdAt,
+    framework: a.framework,
+    method: a.method,
+    riskLevel: a.riskLevel,
+    language: a.language,
+    characters: a.inputLength,
+    detected: a.detectedCount,
+    processed: a.processedCount,
+  };
+}
+
+const CSV_COLUMNS: Record<string, (a: AnalysisSummary) => string | number> = {
+  id: (a) => a.id,
+  created_at: (a) => a.createdAt.toISOString(),
+  framework: (a) => a.framework,
+  method: (a) => a.method,
+  risk_level: (a) => a.riskLevel ?? '',
+  language: (a) => a.language,
+  characters: (a) => a.characters,
+  entities_detected: (a) => a.detected,
+  entities_processed: (a) => a.processed,
+};
+
+/** Quotes a value when it holds a comma, quote or line break. */
+function csvCell(value: string | number) {
+  const text = String(value);
+  return /[",\r\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
 
 /** Entities below this score get a warning in the review UI. */
 export const LOW_CONFIDENCE_BELOW = 0.7;
@@ -65,34 +103,58 @@ export class AnalysesService {
   ) {}
 
   /** The user's analyses, newest first: settings and counts, never text. */
-  async list(
-    userId: string,
-    {
-      limit,
-      before,
-      framework,
-    }: { limit: number; before?: Date; framework?: Framework },
-  ) {
-    const rows = await this.analyses.find({
-      where: {
-        userId,
-        ...(before ? { createdAt: LessThan(before) } : {}),
-        ...(framework ? { framework } : {}),
-      },
-      order: { createdAt: 'DESC' },
-      take: limit,
+  async list(userId: string, query: ListAnalysesDto) {
+    const [rows, total] = await this.analyses.findAndCount({
+      where: this.filterWhere(userId, query),
+      order: { createdAt: 'DESC', id: 'DESC' },
+      skip: query.offset,
+      take: query.limit,
     });
-    return rows.map((a) => ({
-      id: a.id,
-      createdAt: a.createdAt,
-      framework: a.framework,
-      method: a.method,
-      riskLevel: a.riskLevel,
-      language: a.language,
-      characters: a.inputLength,
-      detected: a.detectedCount,
-      processed: a.processedCount,
-    }));
+    return {
+      total,
+      offset: query.offset,
+      limit: query.limit,
+      items: rows.map(toSummary),
+    };
+  }
+
+  /** The filtered list as CSV, newest first, up to EXPORT_LIMIT rows. */
+  async exportCsv(userId: string, filter: AnalysesFilterDto) {
+    const rows = await this.analyses.find({
+      where: this.filterWhere(userId, filter),
+      order: { createdAt: 'DESC', id: 'DESC' },
+      take: EXPORT_LIMIT,
+    });
+    const header = Object.keys(CSV_COLUMNS);
+    const lines = rows.map((row) => {
+      const summary = toSummary(row);
+      return header.map((key) => csvCell(CSV_COLUMNS[key](summary))).join(',');
+    });
+    // BOM: Excel opens UTF-8 CSV correctly only with it.
+    return '\uFEFF' + [header.join(','), ...lines].join('\r\n') + '\r\n';
+  }
+
+  private filterWhere(
+    userId: string,
+    { framework, from, to }: AnalysesFilterDto,
+  ) {
+    if (from && to && from > to) {
+      throw new BadRequestException('"from" must be before "to"');
+    }
+    return {
+      userId,
+      ...(framework ? { framework } : {}),
+      ...(from || to
+        ? {
+            createdAt:
+              from && to
+                ? Between(from, to)
+                : from
+                  ? MoreThanOrEqual(from)
+                  : LessThanOrEqual(to!),
+          }
+        : {}),
+    };
   }
 
   async create(userId: string, dto: CreateAnalysisDto) {
