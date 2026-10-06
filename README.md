@@ -6,7 +6,7 @@ API для де-идентификации медицинских текстов
 - **Де-идентификация** — HIPAA (Safe Harbor / Expert Determination), EU GDPR, UK GDPR, Swiss FADP; английский и украинский.
 - **Синтетические данные** — 4 встроенных типа датасетов, генерация по загруженной таблице или по де-идентифицированному документу, экспорт CSV / JSON / XLSX, отчёт о соответствии и качестве.
 
-Деплой — в [DEPLOY.md](DEPLOY.md).
+Деплой — в [DEPLOY.md](DEPLOY.md). Фронтенд — отдельный репозиторий [medical-app-fe](https://github.com/cebanoleksandr/medical-app-fe).
 
 ## Архитектура
 
@@ -22,7 +22,10 @@ Frontend ──/api──►  NestJS API (этот репозиторий)  ─�
 | `src/auth` | magic link, JWT (15 мин) + refresh-cookie с ротацией, удаление аккаунта |
 | `src/deidentify` | мастер де-идентификации: фреймворки, детекция, режимы замены, извлечение текста из PDF/DOCX/TXT |
 | `src/synthetic` | синтетика: генераторы, источники (файл / документ), экспорт, валидация |
-| `src/audit` | журнал действий, `/activity`, `/dashboard` |
+| `src/audit` | журнал действий, `/activity` |
+| `src/dashboard` | `/dashboard`: счётчики, график по дням и разбивки за период в часовом поясе пользователя |
+| `src/contact` | форма обратной связи с лендинга |
+| `src/mail` | письма (Resend / Brevo / console) и их шаблоны на en и uk |
 | `presidio/` | FastAPI + Presidio: свои распознаватели (MRN, РНОКПП, паспорт UA, AHV…) и фильтры ложных срабатываний |
 
 ## Персональные данные
@@ -113,9 +116,12 @@ npm run migration:revert
 |---|---|
 | Auth | `POST auth/magic-link`, `POST auth/verify`, `POST auth/refresh`, `POST auth/logout`, `GET/DELETE auth/me` |
 | De-identification | `GET analyses/options`, `POST analyses/extract-text`, `POST analyses`, `POST analyses/:id/render` |
+| История анализов | `GET analyses` — список, новые сверху (`framework`, `from`, `to`, `limit` до 100, `offset`); `GET analyses/export` — то же в CSV, без пагинации |
 | Synthetic | `GET synthetic/options`, `POST synthetic/datasets`, `GET synthetic/datasets/:id`, `…/records`, `…/records/:recordId`, `…/validation`, `…/download`, `POST …/regenerate` |
 | Sources | `POST synthetic/sources/file`, `POST synthetic/sources/analysis`, `GET synthetic/sources/:id` |
-| Activity | `GET activity`, `GET dashboard` |
+| Activity | `GET activity` |
+| Dashboard | `GET dashboard` — `from`, `to`, `framework`, `tz` (IANA, например `Europe/Kyiv`; по умолчанию `UTC`) |
+| Health | `GET health` — без авторизации |
 | Contact | `POST contact` — форма «Send us a message» на лендинге, без авторизации: письмо команде и подтверждение посетителю (`locale: en|uk`) |
 
 ### Схема входа для фронтенда
