@@ -11,8 +11,11 @@ export const envValidationSchema = Joi.object({
     Joi.ref('NODE_ENV', { adjust: (env) => env !== 'production' }),
   ),
 
-  // Frontend URL: used for CORS and for building the magic link.
+  // Frontend origin: used for CORS and, by default, for links in emails.
   APP_URL: Joi.string().uri().required(),
+  // Base for links in emails when pages don't live at APP_URL's root, e.g.
+  // https://user.github.io/app/# for GitHub Pages with a hash router.
+  APP_LINK_BASE: Joi.string().uri().optional().allow(''),
   // This API's public origin, for images in emails. On Render it defaults to
   // RENDER_EXTERNAL_URL, which Render sets automatically.
   PUBLIC_API_URL: Joi.string().uri().optional().allow(''),

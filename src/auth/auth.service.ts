@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, LessThan, MoreThan, Repository } from 'typeorm';
 import { AuditAction } from '../audit/audit-event.entity';
 import { AuditService } from '../audit/audit.service';
+import { appLink } from '../mail/app-link';
 import { MailService } from '../mail/mail.service';
 import { Locale, renderMagicLinkEmail } from '../mail/templates/magic-link';
 import { User } from '../users/user.entity';
@@ -79,17 +80,12 @@ export class AuthService {
       expiresAt: new Date(Date.now() + ttlMinutes * 60 * 1000),
     });
 
-    const link = new URL('/auth/verify', this.config.get('APP_URL'));
-    link.searchParams.set('token', token);
+    const branding = this.mail.branding();
+    const link = `${appLink(branding.appUrl, '/auth/verify')}?token=${encodeURIComponent(token)}`;
 
     await this.mail.send({
       to: email,
-      ...renderMagicLinkEmail({
-        locale,
-        link: link.toString(),
-        ttlMinutes,
-        branding: this.mail.branding(),
-      }),
+      ...renderMagicLinkEmail({ locale, link, ttlMinutes, branding }),
     });
   }
 

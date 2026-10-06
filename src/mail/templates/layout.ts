@@ -6,12 +6,15 @@
  * with inline styles. Every helper escapes the text it is given.
  */
 
+import { appLink } from '../app-link';
+
 export const SUPPORTED_LOCALES = ['en', 'uk'] as const;
 export type Locale = (typeof SUPPORTED_LOCALES)[number];
 
 /** Absolute URLs the email needs; images can't be embedded. */
 export interface EmailBranding {
   logoUrl: string;
+  /** Base for page links, joined with `appLink`. */
   appUrl: string;
 }
 
@@ -129,7 +132,7 @@ export function renderLayout(options: {
   const f = footerCopy[locale];
   const year = new Date().getFullYear();
   const link = (path: string, label: string) =>
-    `<a href="${escapeHtml(new URL(path, branding.appUrl).toString())}" target="_blank" style="color:${color.muted};text-decoration:none">${escapeHtml(label)}</a>`;
+    `<a href="${escapeHtml(appLink(branding.appUrl, path))}" target="_blank" style="color:${color.muted};text-decoration:none">${escapeHtml(label)}</a>`;
 
   return `<!doctype html>
 <html lang="${locale}">

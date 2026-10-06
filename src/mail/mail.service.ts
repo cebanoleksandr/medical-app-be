@@ -28,6 +28,7 @@ export class MailService {
   /**
    * Absolute URLs for email templates. The logo is served by this API, so it
    * needs the API's public origin: PUBLIC_API_URL, else the URL Render sets.
+   * Page links start from APP_LINK_BASE, else APP_URL.
    */
   branding(): EmailBranding {
     const apiOrigin =
@@ -36,7 +37,9 @@ export class MailService {
       `http://localhost:${this.config.get('PORT')}`;
     return {
       logoUrl: new URL('/api/email-assets/logo.png', apiOrigin).toString(),
-      appUrl: this.config.get<string>('APP_URL'),
+      appUrl:
+        this.config.get<string>('APP_LINK_BASE') ||
+        this.config.get<string>('APP_URL'),
     };
   }
 
