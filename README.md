@@ -91,6 +91,7 @@ npm run migration:revert
 | Переменная | Назначение |
 |---|---|
 | `APP_URL` | origin фронтенда: CORS, ссылка в письме, ссылки Privacy/Terms в футере писем |
+| `APP_LINK_BASE` | база для ссылок в письмах, если фронтенд не на корне `APP_URL` (GitHub Pages: `https://<user>.github.io/<repo>/#`) |
 | `PUBLIC_API_URL` | публичный адрес API для логотипа в письмах; на Render не нужен (берётся `RENDER_EXTERNAL_URL`) |
 | `DATABASE_URL`, `DATABASE_SSL` | Postgres |
 | `JWT_ACCESS_SECRET` | подпись access-токенов; при смене все пользователи разлогиниваются |
@@ -119,6 +120,6 @@ npm run migration:revert
 
 ### Схема входа для фронтенда
 
-1. `POST /api/auth/magic-link { email, locale: "uk" | "en" }`. В письме придёт ссылка `APP_URL/auth/verify?token=…`.
+1. `POST /api/auth/magic-link { email, locale: "uk" | "en" }`. В письме придёт ссылка `APP_URL/auth/verify?token=…` (или `APP_LINK_BASE/auth/verify?token=…`, если задана).
 2. Страница `/auth/verify` отправляет `POST /api/auth/verify { token }`. Верификация намеренно сделана через POST, а не GET: почтовые сканеры открывают ссылки заранее и «съели» бы одноразовый токен. В ответ приходит `accessToken`, refresh-токен ставится в `httpOnly` cookie.
 3. Access-токен хранится в памяти (не в `localStorage`). При ответе 401 вызывается `POST /api/auth/refresh` с `credentials: 'include'`. Одновременные refresh-запросы лучше объединять в один: повторное использование старого refresh-токена спустя 30 секунд после ротации считается кражей, и тогда сбрасываются все сессии.
